@@ -17,11 +17,8 @@
                 .removeClass('valid')
                 .parent()
                     .addClass('has-error')
-                    .removeClass('has-success'); // twitter bs
 
-            if(conf.borderColorOnError !== '') {
-                $elem.css('border-color', conf.borderColorOnError);
-            }
+            $elem.parent().find('i').addClass(conf.errorElementClass);
         },
         _removeErrorStyle = function($elem, conf) {
             $elem.each(function() {
@@ -29,51 +26,67 @@
                 $(this)
                     .removeClass('valid')
                     .removeClass(conf.errorElementClass)
-                    .css('border-color', '')
+                    .css('border-color', '');
+                        /*
                     .parent()
                         .removeClass('has-error')
-                        .removeClass('has-success')
+                        .removeClass('has-success');
                         .find('.'+conf.errorMessageClass) // remove inline error message
                             .remove();
+                        */
+                
+                var $pp = $(this).data('muikit-popover');
+                if (typeof $pp !== 'undefined') {
+                	$pp.remove();
+                }
+	            $(this).parent().find('i').removeClass(conf.errorElementClass);
             });
         },
         _setInlineErrorMessage = function($input, mess, conf, $messageContainer) {
-            var custom = _getInlineErrorElement($input);
-            if( custom ) {
-                custom.innerHTML = mess;
-            }
-            else if( typeof $messageContainer == 'object' ) {
-                var $found = false;
-                $messageContainer.find('.'+conf.errorMessageClass).each(function() {
-                    if( this.inputReferer == $input[0] ) {
-                        $found = $(this);
-                        return false;
-                    }
-                });
-                if( $found ) {
-                    if( !mess ) {
-                        $found.remove();
-                    } else {
-                        $found.html(mess);
-                    }
-                } else {
-                    var $mess = $('<div class="'+conf.errorMessageClass+'">'+mess+'</div>');
-                    $mess[0].inputReferer = $input[0];
-                    $messageContainer.prepend($mess);
-                }
-            }
-            else {
-                var $mess = $input.parent().find('.'+conf.errorMessageClass+'.help-block');
-                if( $mess.length == 0 ) {
-                    $mess = $('<span></span>').addClass('help-block').addClass(conf.errorMessageClass);
-                    $mess.appendTo($input.parent());
-                }
-                $mess.html(mess);
-            }
-        },
-        _getInlineErrorElement = function($input, conf) {
-            return document.getElementById($input.attr('name')+'_err_msg');
+        	if (mess.length == 0) {
+        		return;
+        	}
+        	
+        	var $pp = $(this).data('muikit-popover');
+			if (typeof $pp === 'undefined') {
+				// show error popover
+				var divId = $input.attr('id') + "_error_popover";
+			
+				var html = 	'<div style="position:absolute" id="' + divId + '">' +
+								'<div class="muik-field-popover critical arrow-bottom">' +
+								'	<i class="fa fa-exclamation-circle fa-1x"></i>' +
+								mess +
+								//'   <span>' + mess + '</span>' +
+								'</div>'+
+							'</div>';
+			
+				var offset = $input.position();			
+				if ($input.parent().hasClass('muik-combobox')) {
+					$input.parent().parent().append(html);
+				} else {
+					$input.parent().append(html);
+				}
+
+				var $popover = $('#' + divId);
+				$input.data('muikit-popover', $popover);
+
+				var PADDING_LEFT = 20;			
+				var w = Math.min($popover.outerWidth(), $input.outerWidth() - PADDING_LEFT);
+				$popover.find('div').css('max-width', w);
+				
+				var e = {};
+				e.pageX = offset.left + $input.outerWidth() - w;
+				e.pageY = offset.top - $popover.outerHeight() - 12;
+			
+				$popover.positionInScreen(e);
+				$popover.find('div').css('opacity', 1);
+				
+			} else {
+				$pp.find('span').html(mess);
+				
+			}
         };
+
 
     /**
     * Assigns validateInputOnBlur function to elements blur event
@@ -147,7 +160,6 @@
                             $help = $('<span />')
                                         .addClass(className)
                                         .addClass('help')
-                                        .addClass('help-block') // twitter bs
                                         .text(help)
                                         .hide();
 
@@ -205,7 +217,6 @@
         }
 
         language = $.extend({}, $.formUtils.LANG, language || {});
-        _removeErrorStyle(this, conf);
 
         var $elem = this,
             $form = $elem.closest("form"),
@@ -221,10 +232,9 @@
         $elem.trigger('validation', [validation===null ? null : validation===true]);
 
         if(validation === true) {
-            $elem
-                .addClass('valid')
-                .parent()
-                    .addClass('has-success'); // twitter bs
+            $elem.addClass('valid');
+	        _removeErrorStyle(this, conf);
+	        
         } else if(validation !== null) {
 
             _applyErrorStyle($elem, conf);
@@ -315,7 +325,7 @@
         };
 
         // Reset style and remove error class
-        $form.find('.'+conf.errorMessageClass+'.alert').remove();
+        //$form.find('.'+conf.errorMessageClass+'.alert').remove();
         _removeErrorStyle($form.find('.'+conf.errorElementClass+',.valid'), conf);
 
         // Validate element values
@@ -336,12 +346,11 @@
 
                 if(validation !== true) {
                     addErrorMessage(validation, $elem);
+                    
                 } else {
                     $elem
                         .valAttr('current-error', false)
-                        .addClass('valid')
-                        .parent()
-                            .addClass('has-success');
+                        .addClass('valid');
                 }
             }
 
@@ -374,7 +383,9 @@
                 });
 
                 // using div instead of P gives better control of css display properties
-                $form.children().eq(0).before('<div class="' + conf.errorMessageClass + ' alert alert-danger">' + messages + '</div>');
+                //$form.children().eq(0).before('<div class="' + conf.errorMessageClass + ' alert alert-danger">' + messages + '</div>');
+                
+                // FIXME
             }
 
             // Display error message below input field or in defined container
@@ -472,8 +483,6 @@
             validateOnBlur : true,
             showHelpOnFocus : true,
             addSuggestions : true,
-            modules : '',
-            onModulesLoaded : null,
             language : false,
             onSuccess : false,
             onError : false
@@ -500,12 +509,6 @@
             // Validate when submitted
             $form.bind('submit.validation', function() {
                 var $form = $(this);
-                if($.formUtils.isLoadingModules) {
-                    setTimeout(function() {
-                        $form.trigger('submit.validation');
-                    }, 200);
-                    return false;
-                }
                 var valid = $form.validateForm(conf.language, conf);
                 if( valid && typeof conf.onSuccess == 'function') {
                     var callbackResponse = conf.onSuccess($form);
@@ -520,7 +523,7 @@
             })
             .bind('reset.validation', function() {
                 // remove messages
-                $(this).find('.'+conf.errorMessageClass+'.alert').remove();
+                //$(this).find('.'+conf.errorMessageClass+'.alert').remove();
                 _removeErrorStyle($(this).find('.'+conf.errorElementClass+',.valid'), conf);
             })
             .addClass('has-validation-callback');
@@ -539,15 +542,6 @@
 			}
 
         });
-
-        if( conf.modules != '' ) {
-            if( typeof conf.onModulesLoaded == 'function' ) {
-                $.formUtils.on('load', function() {
-                    conf.onModulesLoaded();
-                });
-            }
-            $.formUtils.loadModules(conf.modules);
-        }
     };
 
     /**
@@ -560,17 +554,18 @@
          */
         defaultConfig :  function() {
             return {
-                ignore : [], // Names of inputs not to be validated even though node attribute containing the validation rules tells us to
-                errorElementClass : 'error', // Class that will be put on elements which value is invalid
-                borderColorOnError : 'red', // Border color of elements which value is invalid, empty string to not change border color
-                errorMessageClass : 'form-error', // class name of div containing error messages when validation fails
-                validationRuleAttribute : 'data-validation', // name of the attribute holding the validation rules
-                validationErrorMsgAttribute : 'data-validation-error-msg', // define custom err msg inline with element
-                errorMessagePosition : 'element', // Can be either "top" or "element"
+                ignore : [], 						// Names of inputs not to be validated even though node attribute containing the validation rules tells us to
+                errorElementClass : 'critical', 	// Class that will be put on elements which value is invalid
+                validationRuleAttribute : 
+                	'data-validation', 				// name of the attribute holding the validation rules
+                validationErrorMsgAttribute : 
+                	'data-validation-error-msg', 	// define custom err msg inline with element
+                errorMessagePosition : 'element', 	// Can be either "top" or "element"
                 scrollToTopOnError : true,
-                dateFormat : 'yyyy-mm-dd',
-                addValidClassOnAll : false, // whether or not to apply class="valid" even if the input wasn't validated
-                decimalSeparator : '.'
+                addValidClassOnAll : false, 		// whether or not to apply class="valid" even if the input wasn't validated
+                decimalSeparator : ',',                
+				showHelpOnFocus : false,
+				addSuggestions : false
             }
         },
 
@@ -629,127 +624,6 @@
             $.each(this._events[evt] || [], function(i, func) {
                 func(argA, argB);
             });
-        },
-
-        /**
-         * @ {Boolean}
-         */
-        isLoadingModules : false,
-
-        loadedModules : {},
-
-        /**
-        * @example
-        *  $.formUtils.loadModules('date, security.dev');
-        *
-        * Will load the scripts date.js and security.dev.js from the
-        * directory where this script resides. If you want to load
-        * the modules from another directory you can use the
-        * path argument.
-        *
-        * The script will be cached by the browser unless the module
-        * name ends with .dev
-        *
-        * @param {String} modules - Comma separated string with module file names (no directory nor file extension)
-        * @param {String} [path] - Optional, path where the module files is located if their not in the same directory as the core modules
-        * @param {Boolean} [fireEvent] - Optional, whether or not to fire event 'load' when modules finished loading
-        */
-        loadModules : function(modules, path, fireEvent) {
-
-            if( fireEvent === undefined )
-                fireEvent = true;
-
-            if( $.formUtils.isLoadingModules ) {
-                setTimeout(function() {
-                    $.formUtils.loadModules(modules, path, fireEvent);
-                });
-                return;
-            }
-
-            var hasLoadedAnyModule = false,
-                loadModuleScripts = function(modules, path) {
-                    var moduleList = $.split(modules),
-                        numModules = moduleList.length,
-                        moduleLoadedCallback = function() {
-                            numModules--;
-                            if( numModules == 0 ) {
-                                $.formUtils.isLoadingModules = false;
-                                if( fireEvent && hasLoadedAnyModule ) {
-                                    $.formUtils.trigger('load', path);
-                                }
-                            }
-                        };
-
-                    if( numModules > 0 ) {
-                        $.formUtils.isLoadingModules = true;
-                    }
-
-                    var cacheSuffix = '?__='+( new Date().getTime() ),
-                        appendToElement = document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0];
-
-                    $.each(moduleList, function(i, modName) {
-                        modName = $.trim(modName);
-                        if( modName.length == 0 ) {
-                            moduleLoadedCallback();
-                        }
-                        else {
-                            var scriptUrl = path + modName + (modName.substr(-3) == '.js' ? '':'.js'),
-                                script = document.createElement('SCRIPT');
-
-                            if( scriptUrl in $.formUtils.loadedModules ) {
-                                // already loaded
-                                moduleLoadedCallback();
-                            }
-                            else {
-
-                                // Remember that this script is loaded
-                                $.formUtils.loadedModules[scriptUrl] = 1;
-                                hasLoadedAnyModule = true;
-
-                                // Load the script
-                                script.type = 'text/javascript';
-                                script.onload = moduleLoadedCallback;
-                                script.src = scriptUrl + ( scriptUrl.substr(-7) == '.dev.js' ? cacheSuffix:'' );
-                                script.onreadystatechange = function() {
-                                    // IE 7 fix
-                                    if( this.readyState == 'complete' ) {
-                                        moduleLoadedCallback();
-                                    }
-                                };
-                                appendToElement.appendChild( script );
-                            }
-                        }
-                    });
-                };
-
-            if( path ) {
-                loadModuleScripts(modules, path);
-            } else {
-                var findScriptPathAndLoadModules = function() {
-                    var foundPath = false;
-                    $('script').each(function() {
-                        if( this.src ) {
-                            var scriptName = this.src.substr(this.src.lastIndexOf('/')+1, this.src.length);
-                            if(scriptName.indexOf('jquery.form-validator.js') > -1 || scriptName.indexOf('jquery.form-validator.min.js') > -1) {
-                                foundPath = this.src.substr(0, this.src.lastIndexOf('/')) + '/';
-                                if( foundPath == '/' )
-                                    foundPath = '';
-                                return false;
-                            }
-                        }
-                    });
-
-                    if( foundPath !== false) {
-                        loadModuleScripts(modules, foundPath);
-                        return true;
-                    }
-                    return false;
-                };
-
-                if( !findScriptPathAndLoadModules() ) {
-                    $(findScriptPathAndLoadModules);
-                }
-            }
         },
 
         /**
@@ -855,79 +729,6 @@
             } else {
                 return true;
             }
-        },
-
-       /**
-        * Is it a correct date according to given dateFormat. Will return false if not, otherwise
-        * an array 0=>year 1=>month 2=>day
-        *
-        * @param {String} val
-        * @param {String} dateFormat
-        * @return {Array}|{Boolean}
-        */
-        parseDate : function(val, dateFormat) {
-            var divider = dateFormat.replace(/[a-zA-Z]/gi, '').substring(0,1),
-                regexp = '^',
-                formatParts = dateFormat.split(divider),
-                matches, day, month, year;
-
-            $.each(formatParts, function(i, part) {
-               regexp += (i > 0 ? '\\'+divider:'') + '(\\d{'+part.length+'})';
-            });
-
-            regexp += '$';
-            
-            matches = val.match(new RegExp(regexp));
-            if (matches === null) {
-                return false;
-            }
-        
-            var findDateUnit = function(unit, formatParts, matches) {
-                for(var i=0; i < formatParts.length; i++) {
-                    if(formatParts[i].substring(0,1) === unit) {
-                        return $.formUtils.parseDateInt(matches[i+1]);
-                    }
-                }
-                return -1;
-            };
-        
-            month = findDateUnit('m', formatParts, matches);
-            day = findDateUnit('d', formatParts, matches);
-            year = findDateUnit('y', formatParts, matches);
-        
-            if ((month === 2 && day > 28 && (year % 4 !== 0  || year % 100 === 0 && year % 400 !== 0)) 
-            	|| (month === 2 && day > 29 && (year % 4 === 0 || year % 100 !== 0 && year % 400 === 0))
-            	|| month > 12 || month === 0) {
-                return false;
-            }
-            if ((this.isShortMonth(month) && day > 30) || (!this.isShortMonth(month) && day > 31) || day === 0) {
-                return false;
-            }
-        
-            return [year, month, day];
-        },
-
-       /**
-        * skum fix. är talet 05 eller lägre ger parseInt rätt int annars får man 0 när man kör parseInt?
-        *
-        * @param {String} val
-        * @param {Number}
-        */
-        parseDateInt : function(val) {
-            if (val.indexOf('0') === 0) {
-                val = val.replace('0', '');
-            }
-            return parseInt(val,10);
-        },
-
-        /**
-        * Has month only 30 days?
-        *
-        * @param {Number} m
-        * @return {Boolean}
-        */
-        isShortMonth : function(m) {
-            return (m % 2 === 0 && m < 7) || (m % 2 !== 0 && m > 7);
         },
 
        /**
@@ -1224,21 +1025,20 @@
         */
         LANG : {
             errorTitle : 'Form submission failed!',
-            requiredFields : 'You have not answered all required fields',
+            requiredFields : 'Campo obbligatorio',
             badTime : 'You have not given a correct time',
             badEmail : 'You have not given a correct e-mail address',
             badTelephone : 'You have not given a correct phone number',
             badSecurityAnswer : 'You have not given a correct answer to the security question',
-            badDate : 'You have not given a correct date',
+            badDate : 'Data non valida',
             lengthBadStart : 'You must give an answer between ',
             lengthBadEnd : ' characters',
             lengthTooLongStart : 'You have given an answer longer than ',
             lengthTooShortStart : 'You have given an answer shorter than ',
             notConfirmed : 'Values could not be confirmed',
-            badDomain : 'Incorrect domain value',
             badUrl : 'The answer you gave was not a correct URL',
             badCustomVal : 'You gave an incorrect answer',
-            badInt : 'The answer you gave was not a correct number',
+            badInt : 'Numero non valido',
             badSecurityNumber : 'Your social security number was incorrect',
             badUKVatAnswer : 'Incorrect UK VAT Number',
             badStrength : 'The password isn\'t strong enough',
@@ -1278,108 +1078,6 @@
         },
         errorMessage : '',
         errorMessageKey : 'badEmail'
-    });
-
-    /*
-    * Validate domain name
-    */
-    $.formUtils.addValidator({
-        name : 'domain',
-        validatorFunction : function(val, $input) {
-
-            var topDomains =  ['.ac', '.ad', '.ae', '.aero', '.af', '.ag', '.ai', '.al', '.am', '.an', '.ao',
-                        '.aq', '.ar', '.arpa', '.as', '.asia', '.at', '.au', '.aw', '.ax', '.az', '.ba', '.bb',
-                        '.bd', '.be', '.bf', '.bg', '.bh', '.bi', '.bike', '.biz', '.bj', '.bm', '.bn', '.bo',
-                        '.br', '.bs', '.bt', '.bv', '.bw', '.by', '.bz', '.ca', '.camera', '.cat', '.cc', '.cd',
-                        '.cf', '.cg', '.ch', '.ci', '.ck', '.cl', '.clothing', '.cm', '.cn', '.co', '.com',
-                        '.construction', '.contractors', '.coop', '.cr', '.cu', '.cv', '.cw', '.cx', '.cy', '.cz',
-                        '.de', '.diamonds', '.directory', '.dj', '.dk', '.dm', '.do', '.dz', '.ec', '.edu', '.ee',
-                        '.eg', '.enterprises', '.equipment', '.er', '.es', '.estate', '.et', '.eu', '.fi', '.fj',
-                        '.fk', '.fm', '.fo', '.fr', '.ga', '.gallery', '.gb', '.gd', '.ge', '.gf', '.gg', '.gh',
-                        '.gi', '.gl', '.gm', '.gn', '.gov', '.gp', '.gq', '.gr', '.graphics', '.gs', '.gt', '.gu',
-                        '.guru', '.gw', '.gy', '.hk', '.hm', '.hn', '.holdings', '.hr', '.ht', '.hu', '.id', '.ie',
-                        '.il', '.im', '.in', '.info', '.int', '.io', '.iq', '.ir', '.is', '.it', '.je', '.jm', '.jo',
-                        '.jobs', '.jp', '.ke', '.kg', '.kh', '.ki', '.kitchen', '.km', '.kn', '.kp', '.kr', '.kw',
-                        '.ky', '.kz', '.la', '.land', '.lb', '.lc', '.li', '.lighting', '.lk', '.lr', '.ls', '.lt',
-                        '.lu', '.lv', '.ly', '.ma', '.mc', '.md', '.me', '.menu', '.mg', '.mh', '.mil', '.mk', '.ml',
-                        '.mm', '.mn', '.mo', '.mobi', '.mp', '.mq', '.mr', '.ms', '.mt', '.mu', '.museum', '.mv',
-                        '.mw', '.mx', '.my', '.mz', '.na', '.name', '.nc', '.ne', '.net', '.nf', '.ng', '.ni',
-                        '.nl', '.no', '.np', '.nr', '.nu', '.nz', '.om', '.org', '.pa', '.pe', '.pf', '.pg', '.ph',
-                        '.photography', '.pk', '.pl', '.plumbing', '.pm', '.pn', '.post', '.pr', '.pro', '.ps', '.pt',
-                        '.pw', '.py', '.qa', '.re', '.ro', '.rs', '.ru', '.rw', '.sa', '.sb', '.sc', '.sd', '.se',
-                        '.sexy', '.sg', '.sh', '.si', '.singles', '.sj', '.sk', '.sl', '.sm', '.sn', '.so', '.sr',
-                        '.st', '.su', '.sv', '.sx', '.sy', '.sz', '.tattoo', '.tc', '.td', '.technology', '.tel', '.tf',
-                        '.tg', '.th', '.tips', '.tj', '.tk', '.tl', '.tm', '.tn', '.to', '.today', '.tp', '.tr', '.travel',
-                        '.tt', '.tv', '.tw', '.tz', '.ua', '.ug', '.uk', '.uno', '.us', '.uy', '.uz', '.va', '.vc', '.ve',
-                        '.ventures', '.vg', '.vi', '.vn', '.voyage', '.vu', '.wf', '.ws', '.xn--3e0b707e', '.xn--45brj9c',
-                        '.xn--80ao21a', '.xn--80asehdb', '.xn--80aswg', '.xn--90a3ac', '.xn--clchc0ea0b2g2a9gcd', '.xn--fiqs8s',
-                        '.xn--fiqz9s', '.xn--fpcrj9c3d', '.xn--fzc2c9e2c', '.xn--gecrj9c', '.xn--h2brj9c', '.xn--j1amh',
-                        '.xn--j6w193g', '.xn--kprw13d', '.xn--kpry57d', '.xn--l1acc', '.xn--lgbbat1ad8j', '.xn--mgb9awbf',
-                        '.xn--mgba3a4f16a', '.xn--mgbaam7a8h', '.xn--mgbayh7gpa', '.xn--mgbbh1a71e', '.xn--mgbc0a9azcg',
-                        '.xn--mgberp4a5d4ar', '.xn--mgbx4cd0ab', '.xn--ngbc5azd', '.xn--o3cw4h', '.xn--ogbpf8fl', '.xn--p1ai',
-                        '.xn--pgbs0dh', '.xn--q9jyb4c', '.xn--s9brj9c', '.xn--unup4y', '.xn--wgbh1c', '.xn--wgbl6a',
-                        '.xn--xkc2al3hye2a', '.xn--xkc2dl3a5ee0h', '.xn--yfro4i67o', '.xn--ygbi2ammx', '.xxx', '.ye',
-                        '.yt', '.za', '.zm', '.zw'],
-
-                ukTopDomains = ['co', 'me', 'ac', 'gov', 'judiciary','ltd', 'mod', 'net', 'nhs', 'nic',
-                        'org', 'parliament', 'plc', 'police', 'sch', 'bl', 'british-library', 'jet','nls'],
-
-                dot = val.lastIndexOf('.'),
-                domain = val.substring(0, dot),
-                ext = val.substring(dot, val.length),
-                hasTopDomain = false;
-
-            for (var i = 0; i < topDomains.length; i++) {
-                if (topDomains[i] === ext) {
-                    if(ext==='.uk') {
-                        //Run Extra Checks for UK Domain Names
-                        var domainParts = val.split('.');
-                        var tld2 = domainParts[domainParts.length-2];
-                        for(var j = 0; j < ukTopDomains.length; j++) {
-                            if(ukTopDomains[j] === tld2) {
-                                hasTopDomain = true;
-                                break;
-                            }
-                        }
-
-                        if(hasTopDomain)
-                            break;
-
-                    } else {
-                        hasTopDomain = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!hasTopDomain) {
-                return false;
-            } else if (dot < 2 || dot > 57) {
-                return false;
-            } else {
-                var firstChar = domain.substring(0, 1),
-                    lastChar = domain.substring(domain.length - 1, domain.length);
-
-                if (firstChar === '-' || firstChar === '.' || lastChar === '-' || lastChar === '.') {
-                    return false;
-                }
-                if (domain.split('.').length > 3 || domain.split('..').length > 1) {
-                    return false;
-                }
-                if (domain.replace(/[-\da-z\.]/g, '') !== '') {
-                    return false;
-                }
-            }
-
-            // It's valid, lets update input with trimmed value perhaps??
-            if(typeof $input !== 'undefined') {
-                $input.val(val);
-            }
-
-            return true;
-        },
-        errorMessage : '',
-        errorMessageKey: 'badDomain'
     });
 
     /*
@@ -1442,30 +1140,6 @@
     });
 
     /*
-    * Validate url
-    */
-    $.formUtils.addValidator({
-        name : 'url',
-        validatorFunction : function(url) {
-            // written by Scott Gonzalez: http://projects.scottsplayground.com/iri/
-            // - Victor Jonsson added support for arrays in the url ?arg[]=sdfsdf
-            // - General improvements made by Stéphane Moureau <https://github.com/TraderStf>
-            var urlFilter = /^(https?|ftp):\/\/((((\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?(((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|((([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])(\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.)+(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])(\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.?)(:\d*)?)(\/(((\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/((\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)?(\?((([a-z]|\d|\[|\]|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|[\uE000-\uF8FF]|\/|\?)*)?(\#(((\w|-|\.|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|\/|\?)*)?$/i;
-            if( urlFilter.test(url) ) {
-                var domain = url.split('://')[1];
-                var domainSlashPos = domain.indexOf('/');
-                if(domainSlashPos > -1)
-                    domain = domain.substr(0, domainSlashPos);
-
-                return $.formUtils.validators.validate_domain.validatorFunction(domain); // todo: add support for IP-addresses
-            }
-            return false;
-        },
-        errorMessage : '',
-        errorMessageKey: 'badUrl'
-    });
-
-    /*
     * Validate number (floating or integer)
     */
     $.formUtils.addValidator({
@@ -1495,7 +1169,10 @@
                     // Fix for checking range with floats using ,
                     val = val.replace(',', '.');
                 }
-
+                
+                if(allowing.indexOf('integer') > -1 && val.indexOf(decimalSeparator) != -1) {
+                	return false;
+                }
                 if(allowing.indexOf('number') > -1 && val.replace(/[0-9]/g, '') === '' && (!allowsRange || (val >= begin && val <= end)) ) {
                     return true;
                 }
@@ -1558,15 +1235,24 @@
     $.formUtils.addValidator({
         name : 'date',
         validatorFunction : function(date, $el, conf) {
-            var dateFormat = 'yyyy-mm-dd';
+            var dateFormat = 'DD/MM/YYYY';
             if($el.valAttr('format')) {
                 dateFormat = $el.valAttr('format');
             }
             else if( conf.dateFormat ) {
                 dateFormat = conf.dateFormat;
             }
-
-            return $.formUtils.parseDate(date, dateFormat) !== false;
+            
+            var allowsEmpty = false;
+            if($el.valAttr('allows-empty')) {
+	            allowsEmpty = $el.valAttr('allows-empty');
+            }
+            
+            if (date.trim().length == 0 && allowsEmpty) {
+            	return true;
+            }
+			
+			return moment(date, dateFormat).isValid();
         },
         errorMessage : '',
         errorMessageKey: 'badDate'
